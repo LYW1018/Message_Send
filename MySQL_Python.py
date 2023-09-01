@@ -5,8 +5,10 @@ import uuid  # 寫入 Guid 唯一碼
 from datetime import datetime
 
 db = pymysql.connect(
-    host='127.0.0.1', port=3306,
-    user='PLC', password='123123123',
+    host='127.0.0.1',
+    port=3306,
+    user='PLC',
+    password='123123123',
     db='graphiccontrol'
 )
 db.autocommit = True
