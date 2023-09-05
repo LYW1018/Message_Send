@@ -373,6 +373,7 @@ db = pymysql.connect(
 )
 db.autocommit = True
 
+
 #
 # def Show(avg1, avg2, avg3):
 #     print('{} {} {}'.format(avg1, avg2, avg3))
@@ -438,7 +439,74 @@ db.autocommit = True
 #     print('Running... {}'.format(TmpOccurDate))
 # exit(0)
 #
-
+# *************************************************************************************************
+#
+# class RS485:
+#     def __init__(self, port, SlaveAddress):
+#         self.minimalmodbus = minimalmodbus.Instrument(port=port, slaveaddress=SlaveAddress)
+#         self.minimalmodbus.serial.baudrate = 9600
+#         self.minimalmodbus.serial.bytesize = 7
+#         self.minimalmodbus.serial.parity = 'E'
+#         self.minimalmodbus.serial.stopbits = 1
+#         self.minimalmodbus.serial.timeout = 1
+#         self.minimalmodbus.mode = minimalmodbus.MODE_ASCII
+#         self.minimalmodbus.clear_buffers_before_each_transaction = True
+#         self.minimalmodbus.close_port_after_each_call = True
+#
+#     def Read_Bit(self, TmpAddress):
+#         return self.minimalmodbus.read_bit(registeraddress=int(TmpAddress, 16), functioncode=2)
+#
+#     def Write_Bit(self, TmpAddress, TmpBool):
+#         return self.minimalmodbus.write_bit(registeraddress=int(TmpAddress, 16), value=TmpBool, functioncode=5)
+#
+#     def Read_Register(self, TmpAddress):
+#         return self.minimalmodbus.read_register(
+#             registeraddress=int(TmpAddress, 16),
+#             number_of_decimals=0,
+#             functioncode=3,
+#             signed=True
+#         )
+#
+#     def Write_Register(self, TmpAddress, TmpValue):
+#         return self.minimalmodbus.write_register(
+#             registeraddress=int(TmpAddress, 16),
+#             value=TmpValue,
+#             number_of_decimals=0,  # 1 2 3 4
+#             functioncode=16,
+#             signed=True
+#         )
+#
+#
+# def Show(avg1, avg2, avg3):
+#     print('{} {} {}'.format(avg1, avg2, avg3))
+#
+#
+# TmpRS485 = RS485('COM5', 1)
+# while db.open:
+#     with db.cursor() as cursor:
+#         command = "SELECT * FROM `v_words`"
+#         cursor.execute(command)
+#         db.commit()
+#         vals = cursor.fetchall()
+#         TmpOccurTimeStamp = int(time.time())
+#         TmpOccurDate = datetime.fromtimestamp(TmpOccurTimeStamp).strftime("%Y-%m-%d %H:%M:%S")
+#         for n in vals:
+#             # Read
+#             command = "UPDATE `v_words` SET `NowValue` = %s,`updated_at` = %s WHERE `Guid` = %s"
+#             cursor.execute(command, (TmpRS485.Read_Register(TmpAddress=n[2]), TmpOccurDate, n[0]))
+#             db.commit()
+#         for n in vals:
+#             if n[4] != 1:
+#                 continue
+#             if n[5] == 99:
+#                 continue
+#             TmpRS485.Write_Register(TmpAddress=n[2], TmpValue=int(n[5]))
+#             command = "UPDATE `v_words` SET `HandTrigger` = %s,`HandTriggerValue` = %s,`updated_at` = %s WHERE Guid = %s"
+#             cursor.execute(command, (99, 99, TmpOccurDate, n[0]))
+#             db.commit()
+#     print('Running... {}'.format(TmpOccurDate))
+# exit(0)
+# *************************************************************************************************
 class RS485:
     def __init__(self, port, SlaveAddress):
         self.minimalmodbus = minimalmodbus.Instrument(port=port, slaveaddress=SlaveAddress)
@@ -465,24 +533,49 @@ class RS485:
             signed=True
         )
 
+    def Write_Register(self, TmpAddress, TmpValue):
+        return self.minimalmodbus.write_register(
+            registeraddress=int(TmpAddress, 16),
+            value=TmpValue,
+            number_of_decimals=0,  # 1 2 3 4
+            functioncode=16,
+            signed=True
+        )
 
-def Show(avg1, avg2, avg3):
-    print('{} {} {}'.format(avg1, avg2, avg3))
 
+# while True:
+with db.cursor() as cursor:
+    # command = 'SELECT*FROM `User` order by Age DESC'  # 單筆數據排列
+    command = "SELECT*FROM `bit_cells`"
+    cursor.execute(command)
+    db.commit()
+    tmp = cursor.fetchall()
+    for n in tmp:  # 將陣列中的第八項拉出判別，若==1,則將第八項的字串轉換成字典,設變數將字典中的NT及NP數值拉出
+        Int_TimeStamp = int(time.time())
+        TmpDate = datetime.fromtimestamp(Int_TimeStamp).strftime('%Y-%m-%d %H:%M:%S')
+        if n[7] != 1:
+            continue
+        if n[7] == 1:
+            # print(n)
+            B = json.loads(n[8])  # 字串轉成字典
+            NotifyT = int(B['NotifyType'])
+            NotifyP = int(B['NotifyPlatFrom'])
+            NotifyTSPS = 'NotifyTimeStamp'
+            NotifyDT = 'NotifyDateTime'
+            # print(B)
+            if NotifyT == 1 and NotifyP == 2:  # 設條件啟動
+                # print(n)
+                T1 = datetime.fromtimestamp(Int_TimeStamp).strftime('%S')
+                T2 = datetime.fromtimestamp(Int_TimeStamp).strftime('%Y-%m-%d %H:%M:%S')
+                B[NotifyTSPS] = T1
+                B[NotifyDT] = T2
+                C = json.dumps(B)
+                command = "UPDATE `bit_cells` SET `NotifyCollectData`=%s where `Guid`=%s"
+                cursor.execute(command, (C, n[0]))
+                db.commit()
 
-TmpRS485 = RS485('COM5', 1)
-while db.open:
-    with db.cursor() as cursor:
-        command = "SELECT * FROM `v_words`"
-        cursor.execute(command)
-        db.commit()
-        vals = cursor.fetchall()
-        TmpOccurTimeStamp = int(time.time())
-        TmpOccurDate = datetime.fromtimestamp(TmpOccurTimeStamp).strftime("%Y-%m-%d %H:%M:%S")
-        for n in vals:
-            # Read
-            command = "UPDATE `v_words` SET `NowValue` = %s,`updated_at` = %s WHERE `Guid` = %s"
-            cursor.execute(command, (TmpRS485.Read_Register(TmpAddress=n[2]), TmpOccurDate, n[0]))
-            db.commit()
-    print('Running... {}'.format(TmpOccurDate))
-exit(0)
+        #     elif NotifyT == 1 and NotifyP == 1:
+        #         print(n[1], 'Email ON', TmpDate)
+        #     elif NotifyT == 1 and NotifyP == 0:
+        #         print(n[1], 'SMS ON', TmpDate)
+        #     time.sleep(1)
