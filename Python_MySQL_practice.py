@@ -355,6 +355,7 @@ import minimalmodbus
 # *************************************************************************************************
 
 import os
+import requests
 import json
 import time
 import pymysql
@@ -573,6 +574,16 @@ with db.cursor() as cursor:
                 command = "UPDATE `bit_cells` SET `NotifyCollectData`=%s where `Guid`=%s"
                 cursor.execute(command, (C, n[0]))
                 db.commit()
+                Message = '\n ----- 提醒 ----- \n'
+                # for value2 in n:
+                Message += '元件名稱: {} \n'.format(n[1])
+                Message += '元件地址: {}'.format(n[2])
+                LineToken = 'VmYTOq4sCGn128jn1xPjCcArVt9HYitoSsQ2eUgHE7h'  # 金鑰輸入
+                Tmp = requests.post('https://notify-api.line.me/api/notify',
+                                    params={'message': Message},
+                                    headers={'Authorization': 'Bearer ' + LineToken,
+                                             'Content-Type': 'application/x-www-form-urlencoded'})  # 為一規則
+
 
         #     elif NotifyT == 1 and NotifyP == 1:
         #         print(n[1], 'Email ON', TmpDate)
